@@ -1,0 +1,4 @@
+dp_pool_id,capacity,hostname,mapped_ports,volume_label,hostmode,wwn
+3,2g,bn00storag00,"cl7-a,cl7-b,cl8-a,cl8-b",auto_provision_test,WIN_EX,"20:00:00:25:b5:00:0b:2e,20:00:00:25:b5:00:0a:2e"
+,3g,bn00storag001,"cl7-c,cl7-d,cl8-c,cl8-d",auto_provision_1,WIN_EX,"20:00:00:25:b5:00:0b:2f,20:00:00:25:b5:00:0a:2f"
+3,4g,bn00storag001,"cl7-a,cl7-b,cl8-a,cl8-b",auto_provision_2,VMWARE_EX,"20:00:00:25:b5:00:0b:3b,20:00:00:25:b5:00:0a:3b"

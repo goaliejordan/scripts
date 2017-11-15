@@ -1,0 +1,1 @@
+get-wmiobject -computername LAUCA-071CYF -class win32_NetworkAdapterConfiguration  -filter IPEnabled=TRUE | Format-Table computername, IPSubnet, IPAddress

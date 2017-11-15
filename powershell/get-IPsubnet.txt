@@ -1,0 +1,2 @@
+get-wmiobject -class win32_NetworkAdapterConfiguration -filter IPEnabled
+=TRUE | Format-Table computername, IPSubnet, IPAddress

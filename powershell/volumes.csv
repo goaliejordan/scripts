@@ -1,0 +1,4 @@
+VolName,qtreepath,VolSize,LunSize,LunPath,Hostname,IgroupName
+edl01_data,/vol/bidev3_luns/bidev3_data,1536,700g,/vol/bidev3_luns/data_lun/lun,bpeca01-bidev3,bidev3_iscsi
+edl01_tempdb,/vol/bidev3_luns/bidev3_tempdb,190,200g,/vol/bidev3_luns/bidev3_tempdb/lun,bpeca01-bidev3,bidev3_iscsi
+edl01_logs,/vol/bidev3_luns/bidev3_logs,10,100g,/vol/bidev3_luns/bidev3_logs/lun,bpeca01-bidev3,bidev3_iscsi

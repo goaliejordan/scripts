@@ -1,0 +1,237 @@
+<#
+The main purpose of this script is to rename the cifs server and recreate all the cifs share/acl.
+The script has four sub-functions: capture cifs share/acl, remove cifs server, create new cifs server,
+and create all the cifs shares/acl.  You can use the first function to back up the current cifs share/acl
+to csv files, or create additional cifs share/acl with a csv file using the last function.
+
+Date: 6/20/2014
+Version: 1.0
+#>
+
+
+#Check dataontap module
+Import-Module dataontap
+if((Get-Module dataontap).name -eq $null)
+    {
+        write-host "DataOntap module does NOT exist! Please install the module first!"
+		exit
+    }
+	
+	
+#Initialize file names for cifs share and acl
+$cifssharefile = "cifsshare.csv"
+$cifsshareaclfile = "cifsshareacl.csv"
+
+#function to capture cifs share and acl
+function CaptureCifsShare
+{
+	param(
+        [Parameter(Mandatory = $true)] $vserver,
+        [Parameter(Mandatory = $true)] $CifsServer
+        )
+		Get-NcCifsShare -VserverContext $vserver -CifsServer $CifsServer | select Vserver,CifsServer,ShareName,Volume,Path,Comment,@{Name='ShareProperties';Expression={$_.ShareProperties -join '; '}} | export-csv $cifssharefile -notype
+		Get-NcCifsShareacl -VserverContext $vserver | export-csv $cifsshareaclfile -notype
+		Write-Host "The cifs shares and acl information are stored in $cifssharefile and $cifsshareaclfile."
+		pause
+}
+
+#function to remove cifs server
+function RemoveCifsServer
+{
+	param(
+        [Parameter(Mandatory = $true)] $vserver,
+		[Parameter(Mandatory = $true)] $CifsServer,
+        [Parameter(Mandatory = $true)] $ADcred
+        )
+		if(Get-NcCifsServer -VserverContext $vserver -name $CifsServer)
+			{
+				Remove-NcCifsServer -VserverContext $vserver -AdminCredential $ADcred -Confirm:$false -ErrorAction Stop
+				Write-Host "The cifs server $CifsServer is removed from the domain."
+				pause
+			} 
+		else
+			{
+				Write-Host "The cifs server $CifsServer does not exist!"
+				pause
+			}
+}		
+		
+#function to create new cifs server
+function CreateCifsServer
+{
+	param(
+        [Parameter(Mandatory = $true)] $vserver,
+		[Parameter(Mandatory = $true)] $CifsServer,
+        [Parameter(Mandatory = $true)] $ADcred
+        )
+		$CifsServer = Read-Host "Please enter the new cifs server name:"
+		$cifsdomain = Read-Host "Please enter the AD domain to join:"
+		if(Get-NcCifsServer -VserverContext $vserver -name $CifsServer)
+			{
+				Write-Host "The cifs server $CifsServer already exists!"
+				pause
+			} 
+		else
+			{
+				Add-NcCifsServer -Name $CifsServer -Domain $cifsdomain -VserverContext $vserver -AdminCredential $ADcred -AdministrativeStatus up -Confirm:$false -ErrorAction Stop
+				Write-Host "The cifs server $CifsServer is joined to the domain."
+				pause
+				return
+			}
+}				
+		
+#function to create new cifs shares and acl
+function CreateCifsShare
+{
+	param(
+        [Parameter(Mandatory = $true)] $vserver,
+		[Parameter(Mandatory = $true)] $CifsServer,
+        [Parameter(Mandatory = $true)] $ADcred,
+		[Parameter(Mandatory = $true)] $cifssharefile,
+		[Parameter(Mandatory = $true)] $cifsshareaclfile
+        )
+		#create cifs shares
+        $filepath = Get-Location
+		$filepath = $filepath.ToString() + "\" + $cifssharefile
+		If (!(Test-Path $filepath))
+			{
+				(Write-host "The cifs share file does not exist!")
+			}
+
+		$cifsshares = @{}
+		$cifsshares = Import-Csv $filepath -ErrorAction Stop
+		Foreach ($cifsshare in $cifsshares)
+			{
+				if ($cifsshare.Path -ne "/")  			#check if the path is root "/"
+					{if (!(Get-NcCifsShare -Name $cifsshare.ShareName))			#check if share exists
+						{
+							$cifsshare.ShareProperties = $cifsshare.ShareProperties.Replace(";",",")
+							Add-NcCifsShare -Name $cifsshare.ShareName -Path $cifsshare.Path -ShareProperties $cifsshare.ShareProperties -Comment $cifsshare.Comment -VserverContext $vserver -ErrorAction Stop | out-null
+						}
+					}	
+			}
+
+		
+		#create cifs shares acl
+        $filepath = Get-Location
+		$filepath = $filepath.ToString() + "\" + $cifsshareaclfile
+		If (!(Test-Path $filepath))
+			{
+				(Write-host "The cifs share acl file does not exist!")
+			}
+
+		$cifsshareacls = @{}
+		$cifsshareacls = Import-Csv $filepath -ErrorAction Stop
+		Foreach ($cifsshareacl in $cifsshareacls)
+			{
+				if (Get-NcCifsShareAcl -Share $cifsshareacl.Share -UserOrGroup $cifsshareacl.UserOrGroup)
+					{
+						Set-NcCifsShareAcl -Share $cifsshareacl.Share -UserOrGroup $cifsshareacl.UserOrGroup -Permission $cifsshareacl.permission -VserverContext $vserver | out-null
+					}
+				else	
+					{
+						Add-NcCifsShareAcl -Share $cifsshareacl.Share -UserOrGroup $cifsshareacl.UserOrGroup -Permission $cifsshareacl.permission -VserverContext $vserver | out-null
+					}
+			}
+		#print out cifs shares and acl
+		Get-NcCifsShare -VserverContext $vserver | format-table -autosize		
+		Get-NcCifsShareAcl -VserverContext $vserver | format-table -autosize
+		pause	
+}					
+		
+		
+		
+#Collect information
+Clear-Host
+do {
+	"`n"
+    $sourceCluster = Read-Host -Prompt "Enter the Source Cluster name (or IP address)"
+    $sourceVserver = Read-Host -Prompt "Enter the Source Vserver name"
+	$sourceCifsServer = Read-Host -Prompt "Enter the Source cifs server name"
+		"`t`tSource Cluster: {0}`n`t`tSource Vserver: {1}`n`t`tSource cifs server: {2}`n`t`t"-f $sourceCluster,$sourceVserver,$sourceCifsServer
+		$confirm = Read-Host -Prompt "Are these values correct (y/n)?"
+    } While ($confirm -notlike "y")
+
+$scred = Get-Credential -Message "Enter Source cluster username and password"
+$ADcred = Get-Credential -Message "Enter AD Domain username and password"	
+
+#Connect to the cluster
+Connect-NcController $sourceCluster  -Credential $scred -ErrorAction Stop
+
+
+Function Show-Menu
+{
+    Param(
+            [Parameter(Position=0,Mandatory=$True,HelpMessage="Enter your menu text")]
+            [ValidateNotNullOrEmpty()]
+            [array]$Menu,
+            [Parameter(Position=1)]
+            [ValidateNotNullOrEmpty()]
+            [string]$Title="Vserver DR",
+            [switch]$ClearScreen
+    )
+        if ($ClearScreen)
+            {
+                Clear-Host
+            }
+    $menuprompt+="`n"
+    $menuprompt+="`t`t`t{0}`n`t`t`t" -f $title
+    $menuprompt+="-"*$title.Length
+    $menuprompt+="`n"
+	
+    $i=1
+    $array2 = @()
+    $Menu | %{
+        $menuPrompt += "$i $_`n"
+        $i++
+    }
+    $menuprompt+="Select a task by number or Q to quit"
+    Read-Host -Prompt $menuprompt
+
+} #end function
+
+#define a menu here string
+$mainmenu = "Capture cifs shares and acl",
+ "Remove cifs server from AD domain",
+ "Join new cifs server to AD domain",
+ "Create cifs shares and acl",
+ "Run all 4 steps"
+#Do these things prior to starting the menus
+
+Do
+{
+	Switch (Show-Menu $mainmenu "Task Menu" -clear)
+    {
+	    "1" {Write-Host $mainmenu[0] -ForegroundColor Green
+			CaptureCifsShare $sourceVserver $sourceCifsServer
+		}
+        "2" {Write-Host $mainmenu[1] -ForegroundColor Green
+			RemoveCifsServer $sourceVserver $sourceCifsServer $ADcred
+        }
+        "3" {Write-Host $mainmenu[2] -ForegroundColor Green
+			CreateCifsServer $sourceVserver $sourceCifsServer $ADcred
+		}
+		"4" {Write-Host $mainmenu[3] -ForegroundColor Green
+			CreateCifsShare $sourceVserver $sourceCifsServer $ADcred $cifssharefile $cifsshareaclfile
+		}
+		"5" {Write-Host $mainmenu[0] -ForegroundColor Green
+			CaptureCifsShare $sourceVserver $sourceCifsServer
+			Write-Host $mainmenu[1] -ForegroundColor Green
+			RemoveCifsServer $sourceVserver $sourceCifsServer $ADcred
+			Write-Host $mainmenu[2] -ForegroundColor Green
+			CreateCifsServer $sourceVserver $sourceCifsServer $ADcred
+			Write-Host $mainmenu[3] -ForegroundColor Green
+			CreateCifsShare $sourceVserver $sourceCifsServer $ADcred $cifssharefile $cifsshareaclfile
+			Return
+		}
+        "Q"
+        {
+            Write-Host "Goodbye" -ForegroundColor Cyan
+            Return
+        }
+        Default {Write-Warning "Invalid Choice. Try again."
+                sleep -milliseconds 750
+                }
+    } #switch
+} While ($True)
+

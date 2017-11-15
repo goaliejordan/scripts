@@ -1,0 +1,64 @@
+hostname cafiler06a
+ifgrp create lacp vif1 -b ip e0a e0b e0c e0d
+vlan create vif1 121 122
+ifconfig vif1 `hostname`-vif1 mediatype auto netmask 255.255.255.0 partner vif1 mtusize 1500
+ifconfig vif1-121 `hostname`-121 netmask 255.255.255.0 mtusize 1500 -wins partner vif1-121
+ifconfig vif2-122 `hostname`-122 netmask 255.255.255.0 mtusize 1500 -wins partner vif2-122
+route add default 10.100.127.1 1
+routed on
+options dns.domainname bridgepoint.local
+options dns.enable on
+options nis.enable off
+savecore
+
+
+
+
+127.0.0.1 localhost localhost-stack
+127.0.10.1 localhost-10 localhost-bsd
+127.0.20.1 localhost-20 localhost-sk
+10.100.127.61   cafiler06a cafiler06a-vif1
+10.100.121.21   cafiler06a-121.bridgepoint.local cafiler06a-121
+10.100.122.21   cafiler06a-122.bridgepoint.local cafiler06a-122
+10.100.127.61   cafiler06a.bridgepoint.local  cafiler06a
+10.100.121.22   cafiler06b-121.bridgepoint.local cafiler06b-121
+10.100.122.22   cafiler06b-122.bridgepoint.local cafiler06b-122
+10.100.127.62   cafiler06b.bridgepoint.local  cafiler06b
+10.10.100.25    mailhost
+
+
+Evening Creek Networks
+
+NFS-Storage  - 10.100.121.0/24
+iSCSI Storage - 10.100.122.0/24
+
+Filer addresses
+
+10.100.121.21 - ecfiler01-nfs
+10.100.121.22 - ecfiler02-nfs
+
+10.100.122.21 - ecfiler01-iscsi
+10.100.122.22 - ecfiler02-iscsi
+
+10.100.127.61 - ecfiler01-mgmt
+10.100.127.62 - ecfiler02-mgmt
+
+Switch Port assignment
+
+13500-5-3750-04
+port# 33 - cafiler06a-e0a
+port# 35 - cafiler06a-e0b
+port# 37 - cafiler06b-e0a
+port# 39 - cafiler06b-e0b
+port# 41 - cafiler06b-sp
+
+13500-5-3750-03
+port# 33 - cafiler06a-e0c
+port# 35 - cafiler06a-e0d
+port# 37 - cafiler06b-e0c
+port# 39 - cafiler06b-e0d
+port# 41 - cafiler06a-sp
+
+Get-VMHost | Get-VMHostNetworkAdapter | Where-Object {$_.Mac -eq "00:50:56:79:2d:dd"} | Format-List -Property *
+ Get-VM | Get-NetworkAdapter | select parent, name, macaddress | export-csv c:\temp\bpeca-aevcVMmac.csv
+ Get-VM | Get-NetworkAdapter | Where-Object {$_.Macaddress -eq "00:50:56:01:0c:8f"} | Format-List -Property *
